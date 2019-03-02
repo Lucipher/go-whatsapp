@@ -80,7 +80,6 @@ This code is in no way affiliated with, authorized, maintained, sponsored or end
 affiliates or subsidiaries. This is an independent and unofficial software. Use at your own risk.
 
 ## License
-
 The MIT License (MIT)
 
 Copyright (c) 2018

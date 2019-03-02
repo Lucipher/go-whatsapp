@@ -61,7 +61,7 @@ func main() {
 
 	//Disconnect safe
 	fmt.Println("Shutting down now.")
-	session, err := wac.Disconnect()
+	err := wac.Disconnect()
 	if err != nil {
 		log.Fatalf("error disconnecting: %v\n", err)
 	}
