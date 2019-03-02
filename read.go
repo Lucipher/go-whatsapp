@@ -31,7 +31,7 @@ func (wac *Conn) readPump() {
 		case <-readerFound:
 			if readErr != nil {
 				wac.handle(errors.Wrap(readErr, "could not retrieve next Reader"))
-				_, _ = wac.Disconnect()
+				_ = wac.Disconnect()
 				return
 			}
 			msg, err := ioutil.ReadAll(reader)
