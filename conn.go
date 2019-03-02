@@ -1,14 +1,14 @@
-//Package whatsapp provides a developer API to interact with the WhatsAppWeb-Servers.
 package whatsapp
 
 import (
-	"github.com/pkg/errors"
 	"math/rand"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/pkg/errors"
 )
 
 type metric byte
@@ -71,22 +71,19 @@ Conn is created by NewConn. Interacting with the initialized Conn is the main wa
 It holds all necessary information to make the package work internally.
 */
 type Conn struct {
-	ws       *websocketWrapper
-	listener *listenerWrapper
-
-	connected bool
-	loggedIn  bool
-	wg        *sync.WaitGroup
-
-	session        *Session
-	sessionLock    uint32
-	handler        []Handler
-	msgCount       int
-	msgTimeout     time.Duration
-	Info           *Info
-	Store          *Store
-	ServerLastSeen time.Time
-
+	ws              *websocketWrapper
+	listener        *listenerWrapper
+	connected       bool
+	loggedIn        bool
+	wg              *sync.WaitGroup
+	session         *Session
+	sessionLock     uint32
+	handler         []Handler
+	msgCount        int
+	msgTimeout      time.Duration
+	Info            *Info
+	Store           *Store
+	ServerLastSeen  time.Time
 	longClientName  string
 	shortClientName string
 }
@@ -108,24 +105,24 @@ The goroutine for handling incoming messages is started
 */
 func NewConn(timeout time.Duration) (*Conn, error) {
 	wac := &Conn{
-		handler:    make([]Handler, 0),
-		msgCount:   0,
-		msgTimeout: timeout,
-		Store:      newStore(),
-
-		longClientName:  "github.com/rhymen/go-whatsapp",
+		handler:         make([]Handler, 0),
+		msgCount:        0,
+		msgTimeout:      timeout,
+		Store:           newStore(),
+		longClientName:  "github.com/dimaskiddo/go-whatsapp",
 		shortClientName: "go-whatsapp",
 	}
 	return wac, wac.connect()
 }
 
-// connect should be guarded with wsWriteMutex
+// Connect should be guarded with wsWriteMutex
 func (wac *Conn) connect() (err error) {
 	if wac.connected {
 		return ErrAlreadyConnected
 	}
 	wac.connected = true
-	defer func() { // set connected to false on error
+	defer func() {
+		// Set connected to false on error
 		if err != nil {
 			wac.connected = false
 		}
@@ -137,18 +134,19 @@ func (wac *Conn) connect() (err error) {
 		HandshakeTimeout: wac.msgTimeout,
 	}
 
+	svrID := strconv.Itoa(rand.Intn(8) + 1)
 	headers := http.Header{"Origin": []string{"https://web.whatsapp.com"}}
-	wsConn, _, err := dialer.Dial("wss://web.whatsapp.com/ws", headers)
+	wsConn, _, err := dialer.Dial("wss://w"+svrID+".web.whatsapp.com/ws", headers)
 	if err != nil {
 		return errors.Wrap(err, "couldn't dial whatsapp web websocket")
 	}
 
 	wsConn.SetCloseHandler(func(code int, text string) error {
-		// from default CloseHandler
+		// From default CloseHandler
 		message := websocket.FormatCloseMessage(code, "")
 		err := wsConn.WriteControl(websocket.CloseMessage, message, time.Now().Add(time.Second))
 
-		// our close handling
+		// Our close handling
 		wac.handle(&ErrConnectionClosed{Code: code, Text: text})
 		return err
 	})
@@ -164,40 +162,43 @@ func (wac *Conn) connect() (err error) {
 
 	wac.wg = &sync.WaitGroup{}
 	wac.wg.Add(2)
+
 	go wac.readPump()
-	go wac.keepAlive(20000, 90000)
+	go wac.keepAlive(20)
 
 	wac.loggedIn = false
 	return nil
 }
 
-func (wac *Conn) Disconnect() (Session, error) {
+func (wac *Conn) Disconnect() error {
 	if !wac.connected {
-		return Session{}, ErrNotConnected
+		return ErrNotConnected
 	}
+
 	wac.connected = false
 	wac.loggedIn = false
 
-	close(wac.ws.close) //signal close
-	wac.wg.Wait()       //wait for close
+	close(wac.ws.close) // Signal close
+	wac.wg.Wait()       // Wait for close
 
 	err := wac.ws.conn.Close()
 	wac.ws = nil
-	return *wac.session, err
+
+	return err
 }
 
-func (wac *Conn) keepAlive(minIntervalMs int, maxIntervalMs int) {
+func (wac *Conn) keepAlive(interval int) {
 	defer wac.wg.Done()
 
 	for {
 		err := wac.sendKeepAlive()
 		if err != nil {
-			wac.handle(errors.Wrap(err, "keepAlive failed"))
-			//TODO: Consequences?
+			wac.handle(errors.Wrap(err, "keep alive failed"))
+			// TODO: Consequences?
 		}
-		interval := rand.Intn(maxIntervalMs-minIntervalMs) + minIntervalMs
+
 		select {
-		case <-time.After(time.Duration(interval) * time.Millisecond):
+		case <-time.After(time.Duration(interval) * time.Second):
 		case <-wac.ws.close:
 			return
 		}

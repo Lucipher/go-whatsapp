@@ -5,15 +5,38 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"github.com/Rhymen/go-whatsapp/binary"
-	"github.com/Rhymen/go-whatsapp/crypto/cbc"
-	"github.com/gorilla/websocket"
-	"github.com/pkg/errors"
 	"strconv"
 	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/pkg/errors"
+
+	"github.com/dimaskiddo/go-whatsapp/binary"
+	"github.com/dimaskiddo/go-whatsapp/crypto/cbc"
 )
 
-//writeJson enqueues a json message into the writeChan
+func (wac *Conn) sendKeepAlive() error {
+	bytes := []byte("?,,")
+	respChan, err := wac.write(websocket.TextMessage, "!", bytes)
+	if err != nil {
+		return errors.Wrap(err, "error sending keep alive")
+	}
+
+	select {
+	case resp := <-respChan:
+		msecs, err := strconv.ParseInt(resp, 10, 64)
+		if err != nil {
+			return errors.Wrap(err, "Error converting time string to uint")
+		}
+		wac.ServerLastSeen = time.Unix(msecs/1000, (msecs%1000)*int64(time.Millisecond))
+
+	case <-time.After(wac.msgTimeout):
+		return ErrConnectionTimeout
+	}
+
+	return nil
+}
+
 func (wac *Conn) writeJson(data []interface{}) (<-chan string, error) {
 	d, err := json.Marshal(data)
 	if err != nil {
@@ -54,28 +77,6 @@ func (wac *Conn) writeBinary(node binary.Node, metric metric, flag flag, message
 
 	wac.msgCount++
 	return ch, nil
-}
-
-func (wac *Conn) sendKeepAlive() error {
-	bytes := []byte("?,,")
-	respChan, err := wac.write(websocket.TextMessage, "!", bytes)
-	if err != nil {
-		return errors.Wrap(err, "error sending keepAlive")
-	}
-
-	select {
-	case resp := <-respChan:
-		msecs, err := strconv.ParseInt(resp, 10, 64)
-		if err != nil {
-			return errors.Wrap(err, "Error converting time string to uint")
-		}
-		wac.ServerLastSeen = time.Unix(msecs/1000, (msecs%1000)*int64(time.Millisecond))
-
-	case <-time.After(wac.msgTimeout):
-		return ErrConnectionTimeout
-	}
-
-	return nil
 }
 
 func (wac *Conn) write(messageType int, answerMessageTag string, data []byte) (<-chan string, error) {

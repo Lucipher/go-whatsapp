@@ -2,9 +2,10 @@ package whatsapp
 
 import (
 	"fmt"
-	"github.com/Rhymen/go-whatsapp/binary"
 	"strconv"
 	"time"
+
+	"github.com/dimaskido/go-whatsapp/binary"
 )
 
 type Presence string
@@ -17,7 +18,7 @@ const (
 	PresencePaused      = "paused"
 )
 
-//TODO: filename? WhatsApp uses Store.Contacts for these functions
+// TODO: FileName? WhatsApp uses Store.Contacts for these functions
 // functions probably shouldn't return a string, maybe build a struct / return json
 // check for further queries
 func (wac *Conn) GetProfilePicThumb(jid string) (<-chan string, error) {
@@ -173,7 +174,7 @@ func (wac *Conn) query(t, jid, messageId, kind, owner, search string, count, pag
 		return nil, err
 	}
 
-	//TODO: use parseProtoMessage
+	// TODO: use parseProtoMessage
 	return msg, nil
 }
 
@@ -181,7 +182,7 @@ func (wac *Conn) setGroup(t, jid, subject string, participants []string) (<-chan
 	ts := time.Now().Unix()
 	tag := fmt.Sprintf("%d.--%d", ts, wac.msgCount)
 
-	//TODO: get proto or improve encoder to handle []interface{}
+	// TODO: get proto or improve encoder to handle []interface{}
 
 	p := buildParticipantNodes(participants)
 

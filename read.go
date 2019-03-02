@@ -3,13 +3,15 @@ package whatsapp
 import (
 	"crypto/hmac"
 	"crypto/sha256"
-	"github.com/Rhymen/go-whatsapp/binary"
-	"github.com/Rhymen/go-whatsapp/crypto/cbc"
-	"github.com/gorilla/websocket"
-	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"strings"
+
+	"github.com/gorilla/websocket"
+	"github.com/pkg/errors"
+
+	"github.com/dimaskiddo/go-whatsapp/binary"
+	"github.com/dimaskiddo/go-whatsapp/crypto/cbc"
 )
 
 func (wac *Conn) readPump() {
@@ -50,8 +52,9 @@ func (wac *Conn) readPump() {
 func (wac *Conn) processReadData(msgType int, msg []byte) error {
 	data := strings.SplitN(string(msg), ",", 2)
 
-	if data[0][0] == '!' { //Keep-Alive Timestamp
-		data = append(data, data[0][1:]) //data[1]
+	if data[0][0] == '!' {
+		// Keep-Alive Timestamp
+		data = append(data, data[0][1:])
 		data[0] = "!"
 	}
 
@@ -81,27 +84,28 @@ func (wac *Conn) processReadData(msgType int, msg []byte) error {
 			return errors.Wrap(err, "error decoding binary")
 		}
 		wac.dispatch(message)
-	} else { //RAW json status updates
+	} else {
+		// RAW JSON status updates
 		wac.handle(string(data[1]))
 	}
 	return nil
 }
 
 func (wac *Conn) decryptBinaryMessage(msg []byte) (*binary.Node, error) {
-	//message validation
+	// Message Validation
 	h2 := hmac.New(sha256.New, wac.session.MacKey)
 	h2.Write([]byte(msg[32:]))
 	if !hmac.Equal(h2.Sum(nil), msg[:32]) {
 		return nil, ErrInvalidHmac
 	}
 
-	// message decrypt
+	// Message Decrypt
 	d, err := cbc.Decrypt(wac.session.EncKey, nil, msg[32:])
 	if err != nil {
 		return nil, errors.Wrap(err, "decrypting message with AES-CBC failed")
 	}
 
-	// message unmarshal
+	// Message Unmarshal
 	message, err := binary.Unmarshal(d)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not decode binary")
