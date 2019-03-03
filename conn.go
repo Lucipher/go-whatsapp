@@ -1,9 +1,7 @@
 package whatsapp
 
 import (
-	"math/rand"
 	"net/http"
-	"strconv"
 	"sync"
 	"time"
 
@@ -134,10 +132,8 @@ func (wac *Conn) connect() (err error) {
 		HandshakeTimeout: wac.msgTimeout,
 	}
 
-	wsSvrID := strconv.Itoa(rand.Intn(8) + 1)
 	wsHeaders := http.Header{"Origin": []string{"https://web.whatsapp.com"}}
-
-	wsConn, _, err := dialer.Dial("wss://w"+wsSvrID+".web.whatsapp.com/ws", wsHeaders)
+	wsConn, _, err := dialer.Dial("wss://web.whatsapp.com/ws", wsHeaders)
 	if err != nil {
 		return errors.Wrap(err, "couldn't dial whatsapp web websocket")
 	}
@@ -165,7 +161,7 @@ func (wac *Conn) connect() (err error) {
 	wac.wg.Add(2)
 
 	go wac.readPump()
-	go wac.keepAlive(20000, 60000)
+	go wac.keepAlive(20)
 
 	wac.loggedIn = false
 	return nil
@@ -188,7 +184,7 @@ func (wac *Conn) Disconnect() error {
 	return err
 }
 
-func (wac *Conn) keepAlive(minIntervalMs int, maxIntervalMs int) {
+func (wac *Conn) keepAlive(interval int) {
 	defer wac.wg.Done()
 
 	for {
@@ -197,10 +193,9 @@ func (wac *Conn) keepAlive(minIntervalMs int, maxIntervalMs int) {
 			wac.handle(errors.Wrap(err, "keep alive failed"))
 			// TODO: Consequences?
 		}
-		interval := rand.Intn(maxIntervalMs-minIntervalMs) + minIntervalMs
 
 		select {
-		case <-time.After(time.Duration(interval) * time.Millisecond):
+		case <-time.After(time.Duration(interval) * time.Second):
 		case <-wac.ws.close:
 			return
 		}

@@ -122,7 +122,7 @@ github.com/Baozisoftware/qrcode-terminal-go Example login procedure:
 */
 func (wac *Conn) Login(qrChan chan<- string) (Session, error) {
 	session := Session{}
-	//Makes sure that only a single Login or Restore can happen at the same time
+	// Makes sure that only a single Login or Restore can happen at the same time
 	if !atomic.CompareAndSwapUint32(&wac.sessionLock, 0, 1) {
 		return session, ErrLoginInProgress
 	}
@@ -136,7 +136,7 @@ func (wac *Conn) Login(qrChan chan<- string) (Session, error) {
 		return session, err
 	}
 
-	//logged in?!?
+	// Is Logged in?
 	if wac.session != nil && (wac.session.EncKey != nil || wac.session.MacKey != nil) {
 		return session, fmt.Errorf("already logged in")
 	}
@@ -148,7 +148,6 @@ func (wac *Conn) Login(qrChan chan<- string) (Session, error) {
 	}
 
 	session.ClientId = base64.StdEncoding.EncodeToString(clientId)
-	//oldVersion=8691
 	login := []interface{}{"admin", "init", []int{0, 3, 225}, []string{wac.longClientName, wac.shortClientName}, session.ClientId, true}
 	loginChan, err := wac.writeJson(login)
 	if err != nil {
@@ -174,7 +173,7 @@ func (wac *Conn) Login(qrChan chan<- string) (Session, error) {
 		return session, fmt.Errorf("error generating keys: %v\n", err)
 	}
 
-	//listener for Login response
+	// Listener for Login Response
 	s1 := make(chan string, 1)
 	wac.listener.Lock()
 	wac.listener.m["s1"] = s1
@@ -221,7 +220,7 @@ func (wac *Conn) Login(qrChan chan<- string) (Session, error) {
 		return session, fmt.Errorf("hkdf error: %v", err)
 	}
 
-	//login validation
+	// Login Validation
 	checkSecret := make([]byte, 112)
 	copy(checkSecret[:32], decodedSecret[:32])
 	copy(checkSecret[32:], decodedSecret[64:])
@@ -248,7 +247,7 @@ func (wac *Conn) Login(qrChan chan<- string) (Session, error) {
 	return session, nil
 }
 
-//TODO: GoDoc
+// TODO: GoDoc
 /*
 Basically the old RestoreSession functionality
 */
@@ -271,14 +270,15 @@ func (wac *Conn) RestoreWithSession(session Session) (_ Session, err error) {
 	return *wac.session, nil
 }
 
-/*//TODO: GoDoc
+// TODO: GoDoc
+/*
 RestoreSession is the function that restores a given session. It will try to reestablish the connection to the
 WhatsAppWeb servers with the provided session. If it succeeds it will return a new session. This new session has to be
 saved because the Client and Server-Token will change after every login. Logging in with old tokens is possible, but not
 suggested. If so, a challenge has to be resolved which is just another possible point of failure.
 */
 func (wac *Conn) Restore() error {
-	//Makes sure that only a single Login or Restore can happen at the same time
+	// Makes sure that only a single Login or Restore can happen at the same time
 	if !atomic.CompareAndSwapUint32(&wac.sessionLock, 0, 1) {
 		return ErrLoginInProgress
 	}
@@ -296,20 +296,20 @@ func (wac *Conn) Restore() error {
 		return ErrAlreadyLoggedIn
 	}
 
-	//listener for Conn or challenge; s1 is not allowed to drop
+	// Listener for Conn or challenge; s1 is not allowed to drop
 	s1 := make(chan string, 1)
 	wac.listener.Lock()
 	wac.listener.m["s1"] = s1
 	wac.listener.Unlock()
 
-	//admin init
+	// Admin Init
 	init := []interface{}{"admin", "init", []int{0, 3, 225}, []string{wac.longClientName, wac.shortClientName}, wac.session.ClientId, true}
 	initChan, err := wac.writeJson(init)
 	if err != nil {
 		return fmt.Errorf("error writing admin init: %v\n", err)
 	}
 
-	//admin login with takeover
+	// Admin Login with Takeover
 	login := []interface{}{"admin", "login", wac.session.ClientToken, wac.session.ServerToken, wac.session.ClientId, "takeover"}
 	loginChan, err := wac.writeJson(login)
 	if err != nil {
@@ -330,7 +330,7 @@ func (wac *Conn) Restore() error {
 		return fmt.Errorf("restore session init timed out")
 	}
 
-	//wait for s1
+	// Wait for S1
 	var connResp []interface{}
 	select {
 	case r1 := <-s1:
@@ -341,7 +341,7 @@ func (wac *Conn) Restore() error {
 		return fmt.Errorf("restore session connection timed out")
 	}
 
-	//check if challenge is present
+	// Check if Challenge is Present
 	if len(connResp) == 2 && connResp[0] == "Cmd" && connResp[1].(map[string]interface{})["type"] == "challenge" {
 		s2 := make(chan string, 1)
 		wac.listener.Lock()
@@ -362,7 +362,7 @@ func (wac *Conn) Restore() error {
 		}
 	}
 
-	//check for login 200 --> login success
+	// Check for Login Success
 	select {
 	case r := <-loginChan:
 		var resp map[string]interface{}
@@ -381,7 +381,7 @@ func (wac *Conn) Restore() error {
 
 	wac.Info = newInfoFromReq(info)
 
-	//set new tokens
+	// Set New Tokens
 	wac.session.ClientToken = info["clientToken"].(string)
 	wac.session.ServerToken = info["serverToken"].(string)
 	wac.session.Wid = info["wid"].(string)
