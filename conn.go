@@ -134,19 +134,20 @@ func (wac *Conn) connect() (err error) {
 		HandshakeTimeout: wac.msgTimeout,
 	}
 
-	svrID := strconv.Itoa(rand.Intn(8) + 1)
-	headers := http.Header{"Origin": []string{"https://web.whatsapp.com"}}
-	wsConn, _, err := dialer.Dial("wss://w"+svrID+".web.whatsapp.com/ws", headers)
+	wsSvrID := strconv.Itoa(rand.Intn(8) + 1)
+	wsHeaders := http.Header{"Origin": []string{"https://web.whatsapp.com"}}
+
+	wsConn, _, err := dialer.Dial("wss://w"+wsSvrID+".web.whatsapp.com/ws", wsHeaders)
 	if err != nil {
 		return errors.Wrap(err, "couldn't dial whatsapp web websocket")
 	}
 
 	wsConn.SetCloseHandler(func(code int, text string) error {
-		// From default CloseHandler
+		// From Default CloseHandler
 		message := websocket.FormatCloseMessage(code, "")
 		err := wsConn.WriteControl(websocket.CloseMessage, message, time.Now().Add(time.Second))
 
-		// Our close handling
+		// Our Close Handling
 		wac.handle(&ErrConnectionClosed{Code: code, Text: text})
 		return err
 	})
@@ -164,7 +165,7 @@ func (wac *Conn) connect() (err error) {
 	wac.wg.Add(2)
 
 	go wac.readPump()
-	go wac.keepAlive(20)
+	go wac.keepAlive(20000, 60000)
 
 	wac.loggedIn = false
 	return nil
@@ -187,7 +188,7 @@ func (wac *Conn) Disconnect() error {
 	return err
 }
 
-func (wac *Conn) keepAlive(interval int) {
+func (wac *Conn) keepAlive(minIntervalMs int, maxIntervalMs int) {
 	defer wac.wg.Done()
 
 	for {
@@ -196,9 +197,10 @@ func (wac *Conn) keepAlive(interval int) {
 			wac.handle(errors.Wrap(err, "keep alive failed"))
 			// TODO: Consequences?
 		}
+		interval := rand.Intn(maxIntervalMs-minIntervalMs) + minIntervalMs
 
 		select {
-		case <-time.After(time.Duration(interval) * time.Second):
+		case <-time.After(time.Duration(interval) * time.Millisecond):
 		case <-wac.ws.close:
 			return
 		}
