@@ -1,7 +1,9 @@
 package whatsapp
 
 import (
+	"math/rand"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -132,8 +134,9 @@ func (wac *Conn) connect() (err error) {
 		HandshakeTimeout: wac.msgTimeout,
 	}
 
+	wsSvrID := strconv.Itoa(rand.Intn(8) + 1)
 	wsHeaders := http.Header{"Origin": []string{"https://web.whatsapp.com"}}
-	wsConn, _, err := dialer.Dial("wss://web.whatsapp.com/ws", wsHeaders)
+	wsConn, _, err := dialer.Dial("wss://w"+wsSvrID+".web.whatsapp.com/ws", wsHeaders)
 	if err != nil {
 		return errors.Wrap(err, "couldn't dial whatsapp web websocket")
 	}
